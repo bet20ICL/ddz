@@ -7,7 +7,6 @@ const RANK = {
     'J': 8, 'Q': 9, 'K': 10, 'A': 11, '2': 12, 'SmallJoker': 13, 'BigJoker': 14 
 };
 
-
 class Card{
     constructor(suit, value, rank = RANK[value]){
         this.suit = suit;
@@ -20,8 +19,8 @@ export class Deck{
   constructor(cards = freshDeck()){
     this.cards = cards;
     this.rCard;
-    this.info = []; //array of 2d arrays, [rank, frequency]
-    this.count = [0, 0, 0, 0]; //[#of singles, #of pairs, #of triples, #of quadruples]
+    this.info; //array of 2d arrays, [rank, frequency]
+    this.count; //[#of singles, #of pairs, #of triples, #of quadruples]
     this.rank;
     this.type;
   }
@@ -31,29 +30,35 @@ export class Deck{
   }
 
   getInfo(){
+      let tmpArr = [];
       this.sortD();
       for(let i = 0; i < this.numOfCards; i++){
           const cardRank = this.cards[i].rank;
-          const index = this.info.findIndex(x => x[0] === cardRank)
+          const index = tmpArr.findIndex(x => x[0] === cardRank)
           if(index === -1){
-              this.info.push([cardRank, 1]);
+            tmpArr.push([cardRank, 1]);
           } else{
-              this.info[index][1]++;
+            tmpArr[index][1]++;
           }
       }
+      this.info = tmpArr;
       return this.info;
   }
 
   getCount(){
+    this.getInfo();
+    let tmpArr = [0, 0, 0, 0];
       for(let i = 0; i < this.info.length; i++){
-          this.count[this.info[i][1] - 1]++;
+        tmpArr[this.info[i][1] - 1]++;
       }
+      this.count = tmpArr;
       return this.count;
   }
 
   handType(){
-    console.log(this.getInfo());
-    console.log(this.getCount());
+    this.getCount();
+    console.log(this.info);
+    console.log(this.count);
     this.type = -1;
     if(compareArr(this.count, [1, 0, 0, 0])){
         console.log(`Single ${this.cards[0].value}`);
@@ -204,6 +209,21 @@ export class Player{
         console.log(this.deck.cards);
     }
 
+    //check if input deck exists in player deck
+    cardsExist(h){
+        if(h.numOfCards === 0){
+            return true;
+        }
+        const hInfo = h.getInfo();
+        this.deck.getInfo();
+        for(let i = 0; i < hInfo.length; i++){
+            if(this.deck.info.findIndex(x => (x[0] === hInfo[i][0]) && (x[1] >= hInfo[i][1])) === -1){
+                return false;
+            }
+        }
+        return true;
+    }
+
     //getInput method of the Player class
     //should get the player to choose an action: pass or play a valid hand
     //returns valid hand (object of the deck class), or empty array if pass
@@ -211,6 +231,9 @@ export class Player{
     async getInput(boardHand){
         const playerHand = await ask(`${this.name}'s turn: play a hand or pass`, h => {
             const tmp = stringToDeck(h);
+            if(!this.cardsExist(tmp)){
+               throw Error(`Invalid cards chosen`); 
+            }
             if(!compareHands(boardHand, tmp)){
                 throw Error(`Not a valid hand, try again`);
             }
@@ -242,13 +265,15 @@ export const stringToDeck = (input) => {
 //takes in two decks as input
 //returns true if h2 is a valid hand to play against h1 (i.e. either a pass or a bigger hand) otherwise false
 export const compareHands = (h1, h2) => {
-    if((h2.cards.length === 0) || (h1.cards.length === 0)){
+    if(h2.cards.length === 0){
         return true;
     } else{
         const t1 = h1.handType();
         const t2 = h2.handType();
         if(t2 > -1){
-            if(t2 === 13){      //rocket can be played on any hand
+            if (h1.cards.length === 0){ //if board is blank
+                return true;
+            } else if(t2 === 13){      //rocket can be played on any hand
                 return true;
             } else if(t2 === 12){   //bombs can be played on any hand that is not a rocket or a bigger bomb
                 if(t1 < 12 || (t1 === 12 && h2.rank > h1.rank)){
